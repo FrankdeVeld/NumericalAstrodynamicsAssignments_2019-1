@@ -48,8 +48,9 @@ int main()
         getValue< double >( jsonObject, "orbitInitialTime" ) };
     std::vector< double > propagationTimesPerPhase = { 8.0 * 3600.0, 24.0 * 3600.0 };
 
-     //! STUDENT CODE TASK: define variable step-size integrator according to your student number
-    RungeKuttaCoefficients::CoefficientSets coefficientSet;// =
+    //! STUDENT CODE TASK: define variable step-size integrator according to your student number
+
+    RungeKuttaCoefficients::CoefficientSets coefficientSet = RungeKuttaCoefficients::CoefficientSets::rungeKuttaFehlberg45;
 
     ///////////////////////////////////////////////////////////////////
     ////////    RUN CODE FOR QUESTION 1    ////////////////////////////
@@ -59,6 +60,13 @@ int main()
     {
         // Step fixed sizes to use
         std::vector< double > stepSizes = { 25.0, 50.0, 100.0, 200.0 };
+
+        // for d
+        //std::vector< double > stepSizes = { 10.0 };
+
+        //for(double i = 10.5; i < 100.0; i=i+0.5) {
+        //    stepSizes.push_back(i);
+        //}
 
         // Run code for flyby and orbit phase
         for( unsigned int currentPhase = 0; currentPhase < centralBodiesPerPhase.size( ); currentPhase++)
@@ -89,8 +97,9 @@ int main()
                 std::shared_ptr< IntegratorSettings< double > > integratorSettings =
                         getFixedStepSizeIntegratorSettings( currentPhaseStartTime, stepSizes.at( stepSizeCounter ) );
 
-                 //! STUDENT CODE TASK: create dynamics simulator
-                std::shared_ptr< SingleArcDynamicsSimulator< > > dynamicsSimulator;
+                //! STUDENT CODE TASK: create dynamics simulator
+                std::shared_ptr< SingleArcDynamicsSimulator< > > dynamicsSimulator = std::make_shared< SingleArcDynamicsSimulator< > >(
+                            bodyMap, integratorSettings, propagatorSettings );
 
                 // Write numerical results, and difference w.r.t. Kepler orbit, to file
                 std::string fileOutputIdentifier =
@@ -153,7 +162,7 @@ int main()
                 currentPhaseStartTime = getClosestApproachTime( question2FlybyBenchmark );
             }
 
-            // Define final time, centeal body and initial state
+            // Define final time, central body and initial state
             double currentPhaseEndTime = currentPhaseStartTime + propagationTimesPerPhase.at( currentPhase );
             Eigen::Vector6d initialState = getBodyCartesianStateAtEpoch(
                         "JUICE", currentCentralBody, globalFrameOrientation, "NONE", currentPhaseStartTime );
@@ -163,11 +172,18 @@ int main()
                         currentCentralBody, bodyMap );
 
             //! STUDENT CODE TASK: create list of dependent variables (if needed)
+
             std::vector< std::shared_ptr< SingleDependentVariableSaveSettings > > dependentVariablesList;
+            dependentVariablesList.push_back( std::make_shared< SingleDependentVariableSaveSettings >(
+                                                  total_acceleration_norm_dependent_variable, "JUICE" ) );
+            dependentVariablesList.push_back(
+                std::make_shared< SphericalHarmonicAccelerationTermsDependentVariableSaveSettings >("JUICE", currentCentralBody, 0, 0));
+//            dependentVariablesList.push_back( std::make_shared<SingleAccelerationDependentVariableSaveSettings >(
+//                                                  spherical_harmonic_gravity, "JUICE", currentCentralBody, true) );
 
             // Create object with list of dependent variables
             std::shared_ptr< DependentVariableSaveSettings > dependentVariablesToSave =
-                    std::make_shared< DependentVariableSaveSettings >( dependentVariablesList, false );
+                    std::make_shared< DependentVariableSaveSettings >( dependentVariablesList,false);//, false );
 
             // Define propagator settings with perturbations
             std::shared_ptr< TranslationalStatePropagatorSettings< double > > perturbedPropagatorSettings =
@@ -185,7 +201,7 @@ int main()
                     std::make_shared< TranslationalStatePropagatorSettings< double > >(
                         centralBodies, accelerationMapUnperturbed, bodiesToIntegrate,
                         initialState, std::make_shared< PropagationTimeTerminationSettings >( currentPhaseEndTime, true ),
-                        cowell, dependentVariablesToSave );
+                        cowell); //, dependentVariablesToSave );
 
             // Define integrator settings for benchmark
             double benchmarkTimeStep = ( currentPhase == 0 ) ? 1.0 : 5.0;
@@ -194,7 +210,8 @@ int main()
 
             // Propagate benchmark dynamics
             //! STUDENT CODE TASK: create dynamics simulator
-            std::shared_ptr< SingleArcDynamicsSimulator< > > dynamicsSimulator;
+            std::shared_ptr< SingleArcDynamicsSimulator< > > dynamicsSimulator = std::make_shared< SingleArcDynamicsSimulator< > >(
+                        bodyMap, benchmarkIntegratorSettings, perturbedPropagatorSettings );
 
             // Store benchmark results, if currently running question 2
             if( currentQuestion == 2  )
@@ -215,10 +232,12 @@ int main()
             for( unsigned int j = 0; j < integratorTolerances.size(); j++)
             {
                 //! STUDENT CODE TASK: create integrator settings for current run;
-                std::shared_ptr< IntegratorSettings< double > > integratorSettings;
+                std::shared_ptr< IntegratorSettings< double > > integratorSettings =
+                    std::make_shared< RungeKuttaVariableStepSizeSettings< double > >(currentPhaseStartTime, 10, coefficientSet, std::numeric_limits< double >::epsilon(), std::numeric_limits<double>::infinity(),integratorTolerances.at(j),integratorTolerances.at(j));
 
                 //! STUDENT CODE TASK: create dynamics simulator (perturbed dynamics)
-                std::shared_ptr< SingleArcDynamicsSimulator< > > dynamicsSimulator;
+                std::shared_ptr< SingleArcDynamicsSimulator< > > dynamicsSimulator = std::make_shared< SingleArcDynamicsSimulator< > >(
+                          bodyMap, integratorSettings, perturbedPropagatorSettings );
 
                 // Write numerical results, and difference w.r.t. benchmark, to file
                 std::string fileOutputIdentifier = "Q" + std::to_string(currentQuestion) +
@@ -227,7 +246,8 @@ int main()
                             dynamicsSimulator, fileOutputIdentifier, benchmarkInterpolator );
 
                 //! STUDENT CODE TASK: create dynamics simulator (unperturbed dynamics)
-                std::shared_ptr< SingleArcDynamicsSimulator< > > unperturbedDynamicsSimulator;
+                std::shared_ptr< SingleArcDynamicsSimulator< > > unperturbedDynamicsSimulator = std::make_shared< SingleArcDynamicsSimulator< > >(
+                            bodyMap, integratorSettings, unperturbedPropagatorSettings );
 
                 // Write numerical results, and difference w.r.t. Kepler orbit, to file
                 writePropagationResultsAndAnalyticalSolutionToFile(
@@ -253,6 +273,14 @@ int main()
 
         // Iterate over 20 individual steps, separated by 600 s
         double stepPerRun = 600.0;
+
+        // Print analytical solution for 4b
+        std::map<double, Eigen::VectorXd> AnalyticalCartesianState;
+        for ( double t = currentPhaseStartTime - 600.0; t <= currentPhaseStartTime+19.0*600.0+900.0; t = t + 10.0) {
+            AnalyticalCartesianState.insert(std::pair<double,Eigen::VectorXd> (t, getBodyCartesianStateAtEpoch("JUICE","Ganymede",globalFrameOrientation,"NONE",t)));
+        }
+        input_output::writeDataMapToTextFile(AnalyticalCartesianState, "Q4_Analytical_Solution.dat",getCurrentRootPath() + "SimulationOutput" );
+
         for( int i = 0; i < 20; i ++ )
         {
             double currentStartTime = currentPhaseStartTime + static_cast< double >( i ) *
@@ -275,9 +303,17 @@ int main()
                         getFixedStepSizeIntegratorSettings( currentStartTime, timeStep );
 
                 //! STUDENT CODE TASK: create dynamics simulator that propagates for single time step
-                std::shared_ptr< SingleArcDynamicsSimulator< > > dynamicsSimulator;
+                std::shared_ptr< SingleArcDynamicsSimulator< > > dynamicsSimulator = std::make_shared< SingleArcDynamicsSimulator< > >(
+                            bodyMap, integratorSettings, propagatorSettings );
+
 
                 //! STUDENT CODE TASK: compute difference w.r.t. analytical (Keplerian) result
+                std::map< double, Eigen::VectorXd > numericalSolution = dynamicsSimulator->getEquationsOfMotionNumericalSolution( );
+                std::map< double, Eigen::VectorXd > keplerianSolutionDifference =
+                        getDifferenceWrtKeplerOrbit( numericalSolution, bodyMap.at( "Ganymede" )->getGravityFieldModel( )->getGravitationalParameter( ) );
+                writePropagationResultsAndAnalyticalSolutionToFile(
+                            dynamicsSimulator, std::to_string(i) + '_' + 'a',
+                            bodyMap.at( "Ganymede" )->getGravityFieldModel( )->getGravitationalParameter( ) );
             }
 
             {
@@ -295,9 +331,16 @@ int main()
                         std::make_shared< IntegratorSettings< > >( euler, currentStartTime, timeStep );
 
                 //! STUDENT CODE TASK: create dynamics simulator that propagates for single time step
-                std::shared_ptr< SingleArcDynamicsSimulator< > > dynamicsSimulator;
+                std::shared_ptr< SingleArcDynamicsSimulator< > > dynamicsSimulator = std::make_shared< SingleArcDynamicsSimulator< > >(
+                            bodyMap, integratorSettings, propagatorSettings );
 
                 //! STUDENT CODE TASK: compute difference w.r.t. analytical (Keplerian) result
+                std::map< double, Eigen::VectorXd > numericalSolution = dynamicsSimulator->getEquationsOfMotionNumericalSolution( );
+                std::map< double, Eigen::VectorXd > keplerianSolutionDifference =
+                        getDifferenceWrtKeplerOrbit( numericalSolution, bodyMap.at( "Ganymede" )->getGravityFieldModel( )->getGravitationalParameter( ) );
+                writePropagationResultsAndAnalyticalSolutionToFile(
+                            dynamicsSimulator, std::to_string(i) + '_' + 'c',
+                            bodyMap.at( "Ganymede" )->getGravityFieldModel( )->getGravitationalParameter( ) );
             }
         }
     }

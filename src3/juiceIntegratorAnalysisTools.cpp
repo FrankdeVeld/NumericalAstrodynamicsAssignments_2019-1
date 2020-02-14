@@ -27,16 +27,35 @@ std::string getCurrentRootPath( )
 double getClosestApproachTime( std::map< double, Eigen::VectorXd > numericalSolution )
 {
     //! STUDENT CODE TASK: compute epoch of closest approach
-    double closestApproachTime; // = ...
-
+    double closestApproachTime = 980986113;
+    double minimumNorm = pow(10.0,99);
+    for (auto stateIterator : numericalSolution){
+        double currentTime = stateIterator.first;
+        Eigen::VectorXd currentState = stateIterator.second;
+//        std::cout << "Time: loop" << std::endl;
+//        std::cout << currentTime << std::endl;
+//        std::cout << "Norm: loop" << std::endl;
+//        std::cout << currentState.segment(0,3).norm() << std::endl;
+        if (currentState.segment(0,3).norm() < minimumNorm) {
+            minimumNorm = currentState.segment(0,3).norm();
+            closestApproachTime = currentTime;
+        }
+//        std::cout << "closestApproachTime: loop" << std::endl;
+//        std::cout << long(closestApproachTime) << std::endl;
+//        std::cout << "minimumNorm: loop" << std::endl;
+//        std::cout << minimumNorm << std::endl;
+    }
+//    std::cout << "closestApproachTime: end" << std::endl;
+//    std::cout << long(closestApproachTime) << std::endl;
     return closestApproachTime;
 }
 
 std::shared_ptr< IntegratorSettings< double > > getFixedStepSizeIntegratorSettings(
-        const double initialTime, const double timeStep )
+        const double initialTime, const double timeStep)
 {
-     //! STUDENT CODE TASK: create fixed steop RKF7(8) integrator settings (uncomment next line, and fill in .... ).
-     //return std::make_shared< RungeKuttaVariableStepSizeSettings< double > >( .... );
+     //! STUDENT CODE TASK: create fixed step RKF7(8) integrator settings (uncomment next line, and fill in .... ).
+
+    return std::make_shared< RungeKuttaVariableStepSizeSettings< double > >(initialTime, timeStep, RungeKuttaCoefficients::CoefficientSets::rungeKuttaFehlberg78, timeStep, timeStep, 1.0, 1.0, 1.0, false, 0.8, 4.0, 0.1);
 }
 
 AccelerationMap getUnperturbedAccelerations(
@@ -44,14 +63,15 @@ AccelerationMap getUnperturbedAccelerations(
 {
     // Define list of acceleration settings acting on JUICE
     std::map< std::string, std::vector< std::shared_ptr< AccelerationSettings > > > accelerationsOfJuice;
-
+    accelerationsOfJuice[ centralBody ].push_back( std::make_shared< AccelerationSettings >(basic_astrodynamics::central_gravity));
      //! STUDENT CODE TASK: define acceleration settings for unperturbed dynamics (fill up accelerationsOfJuice)
-
     // Create and return full list of accelerations
     SelectedAccelerationMap accelerationSettings;
     accelerationSettings[ "JUICE" ] = accelerationsOfJuice;
+
+
     return createAccelerationModelsMap(
-                bodyMap, accelerationSettings, { "JUICE" }, { centralBody } );
+                bodyMap, accelerationSettings, { "JUICE" }, {centralBody} );
 }
 
 AccelerationMap getPerturbedAccelerations(
@@ -59,6 +79,24 @@ AccelerationMap getPerturbedAccelerations(
 {
     // Define list of acceleration settings acting on JUICE
     std::map< std::string, std::vector< std::shared_ptr< AccelerationSettings > > > accelerationsOfJuice;
+
+    accelerationsOfJuice[ "Io" ].push_back( std::make_shared< AccelerationSettings >(basic_astrodynamics::central_gravity));
+    accelerationsOfJuice[ "Europa" ].push_back( std::make_shared< AccelerationSettings >(basic_astrodynamics::central_gravity));
+    accelerationsOfJuice[ "Sun" ].push_back( std::make_shared< AccelerationSettings >(basic_astrodynamics::central_gravity));
+    accelerationsOfJuice[ "Saturn" ].push_back( std::make_shared< AccelerationSettings >(basic_astrodynamics::central_gravity));
+    accelerationsOfJuice[ "Sun" ].push_back( std::make_shared< AccelerationSettings >(basic_astrodynamics::cannon_ball_radiation_pressure));
+    accelerationsOfJuice[ "Jupiter" ].push_back( std::make_shared< SphericalHarmonicAccelerationSettings >( 6, 0));
+
+    if (centralBody == "Callisto" ) {
+        accelerationsOfJuice[ "Callisto" ].push_back( std::make_shared< SphericalHarmonicAccelerationSettings >( 2, 2));
+        accelerationsOfJuice[ "Ganymede" ].push_back( std::make_shared< AccelerationSettings >(basic_astrodynamics::central_gravity));
+    }
+
+    if (centralBody == "Ganymede" ) {
+        accelerationsOfJuice[ "Ganymede" ].push_back( std::make_shared< SphericalHarmonicAccelerationSettings >( 2, 2));
+        accelerationsOfJuice[ "Callisto" ].push_back( std::make_shared< AccelerationSettings >(basic_astrodynamics::central_gravity));
+        accelerationsOfJuice[ "Ganymede" ].push_back( std::make_shared< AccelerationSettings >(basic_astrodynamics::aerodynamic));
+    }
 
     //! STUDENT CODE TASK: define acceleration settings for perturbed dynamics (fill up accelerationsOfJuice)
 
